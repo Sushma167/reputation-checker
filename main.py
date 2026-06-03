@@ -51,7 +51,20 @@ async def check_rbl(ip: str, rbl_domain: str) -> str:
     elif result == "ERROR":
         return "UNKNOWN"
     else:
-        return "LISTED" # Successful A record resolution implies listed
+        # Check exactly what IP the blacklist returned
+        for rdata in result:
+            returned_ip = rdata.to_text()
+            
+            # Real blacklist hits always start with 127.0.0.x
+            if returned_ip.startswith("127.0.0."):
+                return "LISTED"
+                
+            # Spamhaus returns 127.255.255.x if they rate-limit or block your cloud server
+            elif returned_ip.startswith("127.255.255."):
+                return "UNKNOWN" 
+                
+        # Fallback to prevent false positives
+        return "CLEAN"
 
 # --- API Endpoints ---
 
