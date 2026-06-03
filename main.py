@@ -84,7 +84,7 @@ async def check_ip(ip: str):
         raise HTTPException(status_code=400, detail="Invalid IP Address")
 
     # Replace with your actual AbuseIPDB API key
-    ABUSE_IPDB_KEY = "PASTE_YOUR_API_KEY_HERE"
+    ABUSE_IPDB_KEY = "bddc1ec1ecd4873da5a8929cd48e4d827ba3949b20b811f7694ec352cd4adb823b0216001035212a"
     
     url = "https://api.abuseipdb.com/api/v2/check"
     headers = {
