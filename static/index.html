@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reputation Checker</title>
+    <style>
+        :root {
+            --bg: #f4f7f6; --surface: #ffffff; --text: #333333; --text-muted: #666666;
+            --border: #e0e0e0; --primary: #3b82f6; --primary-hover: #2563eb;
+            --clean: #10b981; --listed: #ef4444; --unknown: #f59e0b;
+        }
+        [data-theme="dark"] {
+            --bg: #0f172a; --surface: #1e293b; --text: #f8fafc; --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); transition: background-color 0.3s, color 0.3s; padding: 2rem; }
+        
+        /* Layout & Typography */
+        .container { max-width: 900px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        h1 { font-size: 1.8rem; font-weight: 700; }
+        
+        /* Controls */
+        button { background: var(--primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+        button:hover { background: var(--primary-hover); }
+        .theme-toggle { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+        .theme-toggle:hover { background: var(--border); }
+        input { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); margin-bottom: 1rem; }
+        
+        /* Cards */
+        .section { background: var(--surface); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .section-title { font-size: 1.2rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+        
+        /* Result Rendering */
+        .result-box { margin-top: 1rem; display: none; animation: fadeIn 0.4s ease-in-out; }
+        .record-item { padding: 0.75rem; background: var(--bg); border-radius: 6px; margin-bottom: 0.5rem; word-break: break-all; }
+        .record-label { font-weight: bold; color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; }
+        
+        /* Badges */
+        .badge { padding: 0.25rem 0.75rem; border-radius: 99px; font-size: 0.8rem; font-weight: bold; display: inline-block; }
+        .badge.clean { background: rgba(16, 185, 129, 0.2); color: var(--clean); }
+        .badge.listed { background: rgba(239, 68, 68, 0.2); color: var(--listed); }
+        .badge.unknown { background: rgba(245, 158, 11, 0.2); color: var(--unknown); }
+        
+        /* Table */
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid var(--border); }
+        th { color: var(--text-muted); font-weight: 600; font-size: 0.9rem; }
+        
+        /* Loading */
+        .loader { display: none; width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 1rem auto; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>🌐 Reputation Checker</h1>
+        <button class="theme-toggle" onclick="toggleTheme()">🌗 Toggle Theme</button>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Domain DNS & Reputation</h2>
+        <input type="text" id="domainInput" placeholder="e.g., google.com">
+        <button onclick="checkDomain()">Check Domain</button>
+        <div id="domainLoader" class="loader"></div>
+        <div id="domainResult" class="result-box"></div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Single IP Reputation</h2>
+        <input type="text" id="ipInput" placeholder="e.g., 8.8.8.8">
+        <button onclick="checkIP()">Check IP</button>
+        <div id="ipLoader" class="loader"></div>
+        <div id="ipResult" class="result-box"></div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Bulk IP Scanner (Max /24)</h2>
+        <input type="text" id="bulkInput" placeholder="e.g., 192.168.1.0/24">
+        <button onclick="checkBulk()">Scan Range</button>
+        <div id="bulkLoader" class="loader"></div>
+        <div id="bulkResult" class="result-box"></div>
+    </div>
+</div>
+
+<script>
+    // Theme Toggle
+    function toggleTheme() {
+        const html = document.documentElement;
+        html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    }
+
+    // Helper: Get badge HTML
+    function getBadge(status) {
+        const s = status.toUpperCase();
+        let cls = 'unknown';
+        if (s === 'CLEAN' || s === 'NOT FOUND') cls = 'clean';
+        if (s === 'LISTED') cls = 'listed';
+        return `<span class="badge ${cls}">${s}</span>`;
+    }
+
+    // Domain Check
+    async function checkDomain() {
+        const input = document.getElementById('domainInput').value.trim();
+        if(!input) return;
+        
+        document.getElementById('domainLoader').style.display = 'block';
+        document.getElementById('domainResult').style.display = 'none';
+        
+        try {
+            const res = await fetch(`/api/domain/${input}`);
+            const data = await res.json();
+            
+            let mxHTML = `<div class="record-item"><div class="record-label">MX Records</div>`;
+            if (data.mx && data.mx.length > 0) {
+                data.mx.forEach(mx => { mxHTML += `<div>Priority ${mx.priority}: <b>${mx.host}</b></div>`; });
+            } else { mxHTML += `<div>Not Found</div>`; }
+            mxHTML += `</div>`;
+
+            document.getElementById('domainResult').innerHTML = `
+                <div class="record-item"><div class="record-label">SPF Record</div><div>${data.spf}</div></div>
+                <div class="record-item"><div class="record-label">DMARC Record</div><div>${data.dmarc}</div></div>
+                ${mxHTML}
+            `;
+            document.getElementById('domainResult').style.display = 'block';
+        } catch (e) {
+            alert('Error fetching domain data.');
+        } finally { document.getElementById('domainLoader').style.display = 'none'; }
+    }
+
+    // Single IP Check
+    async function checkIP() {
+        const input = document.getElementById('ipInput').value.trim();
+        if(!input) return;
+        
+        document.getElementById('ipLoader').style.display = 'block';
+        document.getElementById('ipResult').style.display = 'none';
+        
+        try {
+            const res = await fetch(`/api/ip/${input}`);
+            if(!res.ok) throw new Error("Invalid IP");
+            const data = await res.json();
+            
+            document.getElementById('ipResult').innerHTML = `
+                <div class="record-item" style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size: 1.2rem; font-weight:bold;">Classification</div>
+                    ${getBadge(data.status)}
+                </div>
+                <div class="record-item"><div class="record-label">Spamhaus</div>${getBadge(data.spamhaus)}</div>
+                <div class="record-item"><div class="record-label">Spamcop</div>${getBadge(data.spamcop)}</div>
+                <div class="record-item"><div class="record-label">Barracuda</div>${getBadge(data.barracuda)}</div>
+            `;
+            document.getElementById('ipResult').style.display = 'block';
+        } catch (e) {
+            alert('Error: Make sure the IP is valid.');
+        } finally { document.getElementById('ipLoader').style.display = 'none'; }
+    }
+
+    // Bulk CIDR Check
+    async function checkBulk() {
+        const input = document.getElementById('bulkInput').value.trim();
+        if(!input) return;
+        
+        document.getElementById('bulkLoader').style.display = 'block';
+        document.getElementById('bulkResult').style.display = 'none';
+        
+        try {
+            const res = await fetch(`/api/bulk?cidr=${encodeURIComponent(input)}`);
+            if(!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail);
+            }
+            const data = await res.json();
+            
+            let tableRows = '';
+            data.results.forEach(row => {
+                tableRows += `
+                    <tr>
+                        <td style="font-family: monospace;">${row.ip}</td>
+                        <td>${getBadge(row.status)}</td>
+                        <td>${getBadge(row.spamhaus)}</td>
+                        <td>${getBadge(row.spamcop)}</td>
+                        <td>${getBadge(row.barracuda)}</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('bulkResult').innerHTML = `
+                <p style="margin-bottom: 1rem; color: var(--text-muted);">Scanned ${data.total} IPs.</p>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr><th>IP Address</th><th>Overall</th><th>Spamhaus</th><th>Spamcop</th><th>Barracuda</th></tr>
+                        </thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
+                </div>
+            `;
+            document.getElementById('bulkResult').style.display = 'block';
+        } catch (e) {
+            alert(`Error: ${e.message}`);
+        } finally { document.getElementById('bulkLoader').style.display = 'none'; }
+    }
+</script>
+</body>
+</html>
