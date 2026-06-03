@@ -6,7 +6,16 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional
 
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse # <--- ADD THIS LINE
+from pydantic import BaseModel
+
 app = FastAPI(title="Reputation Checker API")
+@app.get("/")
+async def root():
+    # This automatically sends people to your frontend UI
+    return RedirectResponse(url="/static/index.html")
 
 # Mount static files for the frontend
 app.mount("/static", StaticFiles(directory="static", html=True), name="static")
