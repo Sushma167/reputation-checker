@@ -1,15 +1,12 @@
 import asyncio
 import ipaddress
 import dns.resolver
+import httpx # <--- NEW IMPORT
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import List, Optional
-
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse # <--- ADD THIS LINE
-from pydantic import BaseModel
 
 app = FastAPI(title="Reputation Checker API")
 @app.get("/")
@@ -86,23 +83,42 @@ async def check_ip(ip: str):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid IP Address")
 
-    lists = {
-        "spamhaus": "zen.spamhaus.org",
-        "spamcop": "bl.spamcop.net",
-        "barracuda": "b.barracudacentral.org"
+    # Replace with your actual AbuseIPDB API key
+    ABUSE_IPDB_KEY = "PASTE_YOUR_API_KEY_HERE"
+    
+    url = "https://api.abuseipdb.com/api/v2/check"
+    headers = {
+        'Accept': 'application/json',
+        'Key': ABUSE_IPDB_KEY
+    }
+    params = {
+        'ipAddress': ip, 
+        'maxAgeInDays': '90'
     }
     
-    tasks = [check_rbl(ip, rbl) for rbl in lists.values()]
-    results = await asyncio.gather(*tasks)
-    
-    response_data = dict(zip(lists.keys(), results))
-    response_data["ip"] = ip
-    
-    # Classification Engine
-    listed_count = list(results).count("LISTED")
-    response_data["status"] = "LISTED" if listed_count > 0 else "CLEAN"
-    
-    return response_data
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, params=params, timeout=5.0)
+            
+            if response.status_code == 200:
+                data = response.json()
+                score = data['data']['abuseConfidenceScore']
+                total_reports = data['data']['totalReports']
+                
+                # Logic: If confidence score is over 0, it's listed.
+                status = "LISTED" if score > 0 else "CLEAN"
+                
+                return {
+                    "ip": ip,
+                    "status": status,
+                    "abuseipdb_score": f"{score}%",
+                    "total_reports": total_reports,
+                    "usage": "AbuseIPDB (Real-Time API)"
+                }
+            else:
+                return {"ip": ip, "status": "UNKNOWN", "error": "API Rate Limit or Error"}
+    except Exception as e:
+        return {"ip": ip, "status": "UNKNOWN", "error": str(e)}
 
 @app.get("/api/bulk")
 async def check_bulk(cidr: str = Query(..., description="CIDR format, e.g., 192.168.1.0/24")):
