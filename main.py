@@ -345,23 +345,23 @@ async def bulk_check(cidr: str):
 
         overall = "CLEAN"
 
-       statuses = [
-    spamhaus,
-    spamcop,
-    barracuda
-]
+        statuses = [
+            spamhaus,
+            spamcop,
+            barracuda
+        ]
 
-if "LISTED" in statuses:
-    overall = "LISTED"
+        if "LISTED" in statuses:
+            overall = "LISTED"
 
-elif all(
-    x == "CLEAN"
-    for x in statuses
-):
-    overall = "CLEAN"
+        elif all(
+            x == "CLEAN"
+            for x in statuses
+        ):
+            overall = "CLEAN"
 
-else:
-    overall = "UNKNOWN"
+        else:
+            overall = "UNKNOWN"
 
         results.append({
             "ip": ip,
