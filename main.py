@@ -33,7 +33,6 @@ async def dns_lookup(name, record_type):
     resolver.lifetime = 3
 
     try:
-
         return await asyncio.to_thread(
             resolver.resolve,
             name,
@@ -61,16 +60,12 @@ async def dns_lookup(name, record_type):
 
 async def get_spf(domain):
 
-    result = await dns_lookup(
-        domain,
-        "TXT"
-    )
+    result = await dns_lookup(domain, "TXT")
 
     if result in ["NXDOMAIN", "ERROR"]:
         return "NOT FOUND"
 
     try:
-
         for record in result:
 
             txt = "".join(
@@ -82,7 +77,7 @@ async def get_spf(domain):
             if txt.lower().startswith("v=spf1"):
                 return txt
 
-    except:
+    except Exception:
         pass
 
     return "NOT FOUND"
@@ -102,7 +97,6 @@ async def get_dmarc(domain):
         return "NOT FOUND"
 
     try:
-
         for record in result:
 
             txt = "".join(
@@ -114,7 +108,7 @@ async def get_dmarc(domain):
             if txt.lower().startswith("v=dmarc1"):
                 return txt
 
-    except:
+    except Exception:
         pass
 
     return "NOT FOUND"
@@ -127,16 +121,12 @@ async def get_mx(domain):
 
     records = []
 
-    result = await dns_lookup(
-        domain,
-        "MX"
-    )
+    result = await dns_lookup(domain, "MX")
 
     if result in ["NXDOMAIN", "ERROR"]:
         return records
 
     try:
-
         for mx in result:
 
             records.append({
@@ -144,7 +134,7 @@ async def get_mx(domain):
                 "host": str(mx.exchange).rstrip(".")
             })
 
-    except:
+    except Exception:
         pass
 
     records.sort(
@@ -160,14 +150,10 @@ async def get_mx(domain):
 @app.get("/api/domain/{domain}")
 async def check_domain(domain: str):
 
-    spf_task = get_spf(domain)
-    dmarc_task = get_dmarc(domain)
-    mx_task = get_mx(domain)
-
     spf, dmarc, mx = await asyncio.gather(
-        spf_task,
-        dmarc_task,
-        mx_task
+        get_spf(domain),
+        get_dmarc(domain),
+        get_mx(domain)
     )
 
     return {
@@ -208,21 +194,24 @@ async def check_dnsbl(ip, zone):
 
     try:
 
+        responses = []
+
         for r in result:
-
-            returned = r.to_text()
-
-            print(
-                f"DNSBL DEBUG | {ip} | {zone} | {returned}"
+            responses.append(
+                r.to_text()
             )
 
-            # Genuine blacklist listing
-            if returned.startswith("127.0.0."):
-                return "LISTED"
+        print(
+            f"DNSBL DEBUG: {ip} -> {zone} -> {responses}"
+        )
 
-            # Spamhaus query-blocking / rate limiting
+        for returned in responses:
+
             if returned.startswith("127.255.255."):
                 return "UNKNOWN"
+
+            if returned.startswith("127.0.0."):
+                return "LISTED"
 
         return "CLEAN"
 
@@ -266,25 +255,23 @@ async def check_ip(ip: str):
         DNSBLS["Barracuda"]
     )
 
-    overall = "CLEAN"
-
     statuses = [
-    spamhaus,
-    spamcop,
-    barracuda
-]
+        spamhaus,
+        spamcop,
+        barracuda
+    ]
 
-if "LISTED" in statuses:
-    overall = "LISTED"
+    if "LISTED" in statuses:
+        overall = "LISTED"
 
-elif all(
-    x == "CLEAN"
-    for x in statuses
-):
-    overall = "CLEAN"
+    elif all(
+        x == "CLEAN"
+        for x in statuses
+    ):
+        overall = "CLEAN"
 
-else:
-    overall = "UNKNOWN"
+    else:
+        overall = "UNKNOWN"
 
     return {
         "ip": ip,
@@ -308,7 +295,7 @@ async def bulk_check(cidr: str):
             strict=False
         )
 
-    except:
+    except Exception:
 
         raise HTTPException(
             status_code=400,
@@ -342,8 +329,6 @@ async def bulk_check(cidr: str):
             ip,
             DNSBLS["Barracuda"]
         )
-
-        overall = "CLEAN"
 
         statuses = [
             spamhaus,
