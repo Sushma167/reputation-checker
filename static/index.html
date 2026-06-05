@@ -2,34 +2,76 @@
 <html lang="en" data-theme="dark">
 
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DNSBL Intelligence Center</title>
+
+    <title>DNSBL Intelligence Center | Domain & IP Reputation Checker</title>
+
+    <link rel="icon"
+    href="https://cdn-icons-png.flaticon.com/512/2092/2092063.png">
 
     <link rel="stylesheet" href="/static/style.css">
+
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
 </head>
 
 <body>
 
+<div class="bg-overlay"></div>
+
 <div class="bg-animation"></div>
 
-<header>
+<!-- HERO SECTION -->
 
-    <h1>🛡 DNSBL Intelligence Center</h1>
+<header class="hero">
+
+    <div class="logo-wrap">
+
+        <img
+        src="https://cdn-icons-png.flaticon.com/512/2092/2092063.png"
+        class="logo-img"
+        alt="DNSBL Logo">
+
+        <h1>DNSBL Intelligence Center</h1>
+
+    </div>
 
     <p>
         Real-Time DNS • SPF • DMARC • MX • DNSBL Intelligence
     </p>
 
-    <button onclick="toggleTheme()" class="theme-btn">
+    <button
+        onclick="toggleTheme()"
+        class="theme-btn">
         Toggle Theme
     </button>
 
 </header>
 
+<!-- PROJECT DESCRIPTION -->
+
+<section class="info-box">
+
+    <h2>Threat Intelligence Dashboard</h2>
+
+    <p>
+        Monitor SPF, DMARC, MX records and DNSBL reputation
+        in real time. Analyze domains, investigate IP reputation,
+        and scan entire ranges against major blacklist providers.
+    </p>
+
+</section>
+
+<!-- MAIN CONTAINER -->
+
 <div class="container">
 
-    <section class="card">
+    <!-- DOMAIN SECTION -->
+
+    <section class="panel">
 
         <h2>🌐 Domain Intelligence</h2>
 
@@ -45,7 +87,9 @@
 
     </section>
 
-    <section class="card">
+    <!-- SINGLE IP SECTION -->
+
+    <section class="panel">
 
         <h2>🛡 Single IP Intelligence</h2>
 
@@ -61,7 +105,9 @@
 
     </section>
 
-    <section class="card">
+    <!-- BULK IP SECTION -->
+
+    <section class="panel">
 
         <h2>⚡ Bulk IP Intelligence</h2>
 
@@ -79,6 +125,8 @@
 
 </div>
 
+<!-- FOOTER -->
+
 <footer>
 
     <h3>About DNSBL Intelligence Center</h3>
@@ -87,13 +135,28 @@
         Real-time SPF, DMARC, MX and DNSBL reputation intelligence.
     </p>
 
-    <p>
-        Sources: Spamhaus • Spamcop • Barracuda
-    </p>
+    <div class="footer-tags">
+
+        <span>Spamhaus</span>
+
+        <span>Spamcop</span>
+
+        <span>Barracuda</span>
+
+        <span>SPF</span>
+
+        <span>DMARC</span>
+
+        <span>MX</span>
+
+        <span>DNSBL</span>
+
+    </div>
 
 </footer>
 
 <script src="/static/app.js"></script>
 
 </body>
+
 </html>
