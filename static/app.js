@@ -1,5 +1,5 @@
 // =====================================
-// THEME SYSTEM
+// THEME
 // =====================================
 
 function toggleTheme() {
@@ -11,8 +11,8 @@ function toggleTheme() {
 
     const next =
         current === "dark"
-            ? "light"
-            : "dark";
+        ? "light"
+        : "dark";
 
     html.setAttribute(
         "data-theme",
@@ -25,7 +25,7 @@ function toggleTheme() {
     );
 }
 
-window.onload = () => {
+window.addEventListener("load", () => {
 
     const saved =
         localStorage.getItem("theme");
@@ -38,7 +38,7 @@ window.onload = () => {
                 saved
             );
     }
-};
+});
 
 // =====================================
 // LOADER
@@ -47,9 +47,9 @@ window.onload = () => {
 function loader(){
 
     return `
-    <div style="padding:30px;text-align:center">
-        <div class="loader"></div>
-    </div>
+        <div style="padding:30px;text-align:center;">
+            <div class="loader"></div>
+        </div>
     `;
 }
 
@@ -66,7 +66,10 @@ async function checkDomain(){
 
     if(!domain){
 
-        alert("Enter a domain");
+        alert(
+            "Please enter a domain"
+        );
+
         return;
     }
 
@@ -80,13 +83,13 @@ async function checkDomain(){
 
     try{
 
-        const res =
+        const response =
             await fetch(
                 `/api/domain/${domain}`
             );
 
         const data =
-            await res.json();
+            await response.json();
 
         let mxRows = "";
 
@@ -110,7 +113,7 @@ async function checkDomain(){
             mxRows = `
             <tr>
                 <td colspan="2">
-                    No MX Records Found
+                    No MX records found
                 </td>
             </tr>
             `;
@@ -161,18 +164,49 @@ async function checkDomain(){
 
         `;
 
-    }catch(err){
+    }catch(error){
 
         output.innerHTML = `
 
         <div class="result-card">
 
-            Error retrieving domain data
+            Unable to retrieve domain information
 
         </div>
 
         `;
     }
+}
+
+// =====================================
+// STATUS BADGE
+// =====================================
+
+function getBadge(status){
+
+    if(status === "LISTED"){
+
+        return `
+        <span class="badge-listed">
+            LISTED
+        </span>
+        `;
+    }
+
+    if(status === "CLEAN"){
+
+        return `
+        <span class="badge-clean">
+            CLEAN
+        </span>
+        `;
+    }
+
+    return `
+    <span class="badge-warning">
+        UNKNOWN
+    </span>
+    `;
 }
 
 // =====================================
@@ -188,7 +222,10 @@ async function checkIP(){
 
     if(!ip){
 
-        alert("Enter an IP");
+        alert(
+            "Please enter an IP address"
+        );
+
         return;
     }
 
@@ -202,40 +239,13 @@ async function checkIP(){
 
     try{
 
-        const res =
+        const response =
             await fetch(
                 `/api/ip/${ip}`
             );
 
         const data =
-            await res.json();
-
-        function badge(status){
-
-            if(status==="LISTED"){
-
-                return `
-                <span class="badge-listed">
-                    LISTED
-                </span>
-                `;
-            }
-
-            if(status==="CLEAN"){
-
-                return `
-                <span class="badge-clean">
-                    CLEAN
-                </span>
-                `;
-            }
-
-            return `
-            <span class="badge-warning">
-                UNKNOWN
-            </span>
-            `;
-        }
+            await response.json();
 
         output.innerHTML = `
 
@@ -253,7 +263,7 @@ async function checkIP(){
 
             <h3>Spamhaus</h3>
 
-            ${badge(data.spamhaus)}
+            ${getBadge(data.spamhaus)}
 
         </div>
 
@@ -261,7 +271,7 @@ async function checkIP(){
 
             <h3>Spamcop</h3>
 
-            ${badge(data.spamcop)}
+            ${getBadge(data.spamcop)}
 
         </div>
 
@@ -269,27 +279,27 @@ async function checkIP(){
 
             <h3>Barracuda</h3>
 
-            ${badge(data.barracuda)}
+            ${getBadge(data.barracuda)}
 
         </div>
 
         <div class="result-card">
 
-            <h3>Overall Status</h3>
+            <h3>Overall Reputation</h3>
 
-            ${badge(data.overall)}
+            ${getBadge(data.overall)}
 
         </div>
 
         `;
 
-    }catch(err){
+    }catch(error){
 
         output.innerHTML = `
 
         <div class="result-card">
 
-            Unable to check IP reputation
+            Failed to check IP reputation
 
         </div>
 
@@ -298,7 +308,7 @@ async function checkIP(){
 }
 
 // =====================================
-// BULK IP CHECK
+// BULK CHECK
 // =====================================
 
 async function checkBulk(){
@@ -311,7 +321,7 @@ async function checkBulk(){
     if(!cidr){
 
         alert(
-            "Enter CIDR range"
+            "Please enter a CIDR range"
         );
 
         return;
@@ -327,13 +337,13 @@ async function checkBulk(){
 
     try{
 
-        const res =
+        const response =
             await fetch(
                 `/api/bulk?cidr=${encodeURIComponent(cidr)}`
             );
 
         const data =
-            await res.json();
+            await response.json();
 
         if(data.detail){
 
@@ -360,13 +370,21 @@ async function checkBulk(){
 
                 <td>${item.ip}</td>
 
-                <td>${item.spamhaus}</td>
+                <td>
+                    ${getBadge(item.spamhaus)}
+                </td>
 
-                <td>${item.spamcop}</td>
+                <td>
+                    ${getBadge(item.spamcop)}
+                </td>
 
-                <td>${item.barracuda}</td>
+                <td>
+                    ${getBadge(item.barracuda)}
+                </td>
 
-                <td>${item.overall}</td>
+                <td>
+                    ${getBadge(item.overall)}
+                </td>
 
             </tr>
 
@@ -378,7 +396,7 @@ async function checkBulk(){
         <div class="result-card">
 
             <h3>
-                Range:
+                CIDR Range:
                 ${data.cidr}
             </h3>
 
@@ -419,7 +437,7 @@ async function checkBulk(){
 
         `;
 
-    }catch(err){
+    }catch(error){
 
         output.innerHTML = `
 
