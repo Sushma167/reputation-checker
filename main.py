@@ -33,6 +33,7 @@ async def dns_lookup(name, record_type):
     resolver.lifetime = 3
 
     try:
+
         return await asyncio.to_thread(
             resolver.resolve,
             name,
@@ -41,6 +42,15 @@ async def dns_lookup(name, record_type):
 
     except dns.resolver.NXDOMAIN:
         return "NXDOMAIN"
+
+    except dns.resolver.NoAnswer:
+        return "NXDOMAIN"
+
+    except dns.resolver.NoNameservers:
+        return "ERROR"
+
+    except dns.resolver.Timeout:
+        return "ERROR"
 
     except Exception:
         return "ERROR"
@@ -202,13 +212,26 @@ async def check_dnsbl(ip, zone):
 
             returned = r.to_text()
 
-            # DNSBL listings typically return 127.x.x.x
-            if returned.startswith("127."):
+            print(
+                f"DNSBL DEBUG | {ip} | {zone} | {returned}"
+            )
+
+            # Genuine blacklist listing
+            if returned.startswith("127.0.0."):
                 return "LISTED"
+
+            # Spamhaus query-blocking / rate limiting
+            if returned.startswith("127.255.255."):
+                return "UNKNOWN"
 
         return "CLEAN"
 
-    except:
+    except Exception as e:
+
+        print(
+            f"DNSBL ERROR: {e}"
+        )
+
         return "UNKNOWN"
 
 # ==================================================
@@ -245,12 +268,23 @@ async def check_ip(ip: str):
 
     overall = "CLEAN"
 
-    if (
-        spamhaus == "LISTED"
-        or spamcop == "LISTED"
-        or barracuda == "LISTED"
-    ):
-        overall = "LISTED"
+    statuses = [
+    spamhaus,
+    spamcop,
+    barracuda
+]
+
+if "LISTED" in statuses:
+    overall = "LISTED"
+
+elif all(
+    x == "CLEAN"
+    for x in statuses
+):
+    overall = "CLEAN"
+
+else:
+    overall = "UNKNOWN"
 
     return {
         "ip": ip,
@@ -311,12 +345,23 @@ async def bulk_check(cidr: str):
 
         overall = "CLEAN"
 
-        if (
-            spamhaus == "LISTED"
-            or spamcop == "LISTED"
-            or barracuda == "LISTED"
-        ):
-            overall = "LISTED"
+       statuses = [
+    spamhaus,
+    spamcop,
+    barracuda
+]
+
+if "LISTED" in statuses:
+    overall = "LISTED"
+
+elif all(
+    x == "CLEAN"
+    for x in statuses
+):
+    overall = "CLEAN"
+
+else:
+    overall = "UNKNOWN"
 
         results.append({
             "ip": ip,
