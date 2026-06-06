@@ -167,61 +167,92 @@ async def check_domain(domain: str):
 # DNSBL ENGINE
 # ==================================================
 
-DNSBLS = {
-    "Spamhaus": "zen.spamhaus.org",
-    "Spamcop": "bl.spamcop.net",
-    "Barracuda": "b.barracudacentral.org"
-}
+# ==================================================
+# SPAMHAUS CSS / SBL / XBL / PBL / AUTHBL
+# ==================================================
 
-async def check_dnsbl(ip, zone):
+SPAMHAUS_ZEN = "zen.spamhaus.org"
+
+async def check_spamhaus(ip):
 
     reversed_ip = ".".join(
         reversed(ip.split("."))
     )
 
-    query = f"{reversed_ip}.{zone}"
+    query = f"{reversed_ip}.{SPAMHAUS_ZEN}"
 
     result = await dns_lookup(
         query,
         "A"
     )
 
-    if result == "NXDOMAIN":
-        return "CLEAN"
+    response = {
+        "css": "NOT LISTED",
+        "sbl": "NOT LISTED",
+        "xbl": "NOT LISTED",
+        "pbl": "NOT LISTED",
+        "authbl": "NOT LISTED"
+    }
 
-    if result == "ERROR":
-        return "UNKNOWN"
+    if result in ["NXDOMAIN"]:
+        return response
+
+    if result in ["ERROR"]:
+        return response
 
     try:
 
-        responses = []
-
         for r in result:
-            responses.append(
-                r.to_text()
+
+            code = r.to_text()
+
+            print(
+                f"SPAMHAUS DEBUG | {ip} | {code}"
             )
 
-        print(
-            f"DNSBL DEBUG: {ip} -> {zone} -> {responses}"
-        )
+            # CSS
+            if code in [
+                "127.0.0.3",
+                "127.0.0.4",
+                "127.0.0.5",
+                "127.0.0.6",
+                "127.0.0.7"
+            ]:
+                response["css"] = "LISTED"
 
-        for returned in responses:
+            # SBL
+            elif code == "127.0.0.2":
+                response["sbl"] = "LISTED"
 
-            if returned.startswith("127.255.255."):
-                return "UNKNOWN"
+            # XBL
+            elif code in [
+                "127.0.0.9",
+                "127.0.0.10",
+                "127.0.0.11"
+            ]:
+                response["xbl"] = "LISTED"
 
-            if returned.startswith("127.0.0."):
-                return "LISTED"
+            # PBL
+            elif code in [
+                "127.0.0.12",
+                "127.0.0.13",
+                "127.0.0.14"
+            ]:
+                response["pbl"] = "LISTED"
 
-        return "CLEAN"
+            # AuthBL
+            elif code == "127.0.1.255":
+                response["authbl"] = "LISTED"
+
+        return response
 
     except Exception as e:
 
         print(
-            f"DNSBL ERROR: {e}"
+            f"SPAMHAUS ERROR: {e}"
         )
 
-        return "UNKNOWN"
+        return response
 
 # ==================================================
 # SINGLE IP API
@@ -240,124 +271,42 @@ async def check_ip(ip: str):
             detail="Invalid IP Address"
         )
 
-    spamhaus = await check_dnsbl(
-        ip,
-        DNSBLS["Spamhaus"]
-    )
-
-    spamcop = await check_dnsbl(
-        ip,
-        DNSBLS["Spamcop"]
-    )
-
-    barracuda = await check_dnsbl(
-        ip,
-        DNSBLS["Barracuda"]
-    )
-
-    statuses = [
-        spamhaus,
-        spamcop,
-        barracuda
-    ]
-
-    if "LISTED" in statuses:
-        overall = "LISTED"
-
-    elif all(
-        x == "CLEAN"
-        for x in statuses
-    ):
-        overall = "CLEAN"
-
-    else:
-        overall = "UNKNOWN"
+    spamhaus = await check_spamhaus(ip)
 
     return {
         "ip": ip,
-        "spamhaus": spamhaus,
-        "spamcop": spamcop,
-        "barracuda": barracuda,
-        "overall": overall
+        "css": spamhaus["css"],
+        "sbl": spamhaus["sbl"],
+        "xbl": spamhaus["xbl"],
+        "pbl": spamhaus["pbl"],
+        "authbl": spamhaus["authbl"]
     }
-
 # ==================================================
 # BULK CIDR API
 # ==================================================
 
-@app.get("/api/bulk")
-async def bulk_check(cidr: str):
+for ip in network.hosts():
 
-    try:
+    ip = str(ip)
 
-        network = ipaddress.ip_network(
-            cidr,
-            strict=False
-        )
+    spamhaus = await check_spamhaus(ip)
 
-    except Exception:
+    results.append({
+        "ip": ip,
+        "css": spamhaus["css"],
+        "sbl": spamhaus["sbl"],
+        "xbl": spamhaus["xbl"],
+        "pbl": spamhaus["pbl"],
+        "authbl": spamhaus["authbl"]
+    })
 
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid CIDR Format"
-        )
-
-    if network.num_addresses > 256:
-
-        raise HTTPException(
-            status_code=400,
-            detail="Maximum range allowed is /24"
-        )
-
-    results = []
-
-    for ip in network.hosts():
-
-        ip = str(ip)
-
-        spamhaus = await check_dnsbl(
-            ip,
-            DNSBLS["Spamhaus"]
-        )
-
-        spamcop = await check_dnsbl(
-            ip,
-            DNSBLS["Spamcop"]
-        )
-
-        barracuda = await check_dnsbl(
-            ip,
-            DNSBLS["Barracuda"]
-        )
-
-        statuses = [
-            spamhaus,
-            spamcop,
-            barracuda
-        ]
-
-        if "LISTED" in statuses:
-            overall = "LISTED"
-
-        elif all(
-            x == "CLEAN"
-            for x in statuses
-        ):
-            overall = "CLEAN"
-
-        else:
-            overall = "UNKNOWN"
-
-        results.append({
-            "ip": ip,
-            "spamhaus": spamhaus,
-            "spamcop": spamcop,
-            "barracuda": barracuda,
-            "overall": overall
-        })
-
-    return {
-        "cidr": cidr,
-        "total": len(results),
-        "results": results
-    }
+  return {
+    "ip": ip,
+    "results": [
+        {"blacklist": "CSS", "status": spamhaus["css"]},
+        {"blacklist": "SBL", "status": spamhaus["sbl"]},
+        {"blacklist": "XBL", "status": spamhaus["xbl"]},
+        {"blacklist": "PBL", "status": spamhaus["pbl"]},
+        {"blacklist": "AuthBL", "status": spamhaus["authbl"]}
+    ]
+}
