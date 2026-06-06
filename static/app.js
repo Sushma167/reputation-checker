@@ -436,7 +436,18 @@ async function checkBulk(){
         </div>
 
         `;
-
+data.results.forEach(row => {
+    tbody.innerHTML += `
+        <tr>
+            <td>${row.ip}</td>
+            <td>${row.css}</td>
+            <td>${row.sbl}</td>
+            <td>${row.xbl}</td>
+            <td>${row.pbl}</td>
+            <td>${row.authbl}</td>
+        </tr>
+    `;
+});
     }catch(error){
 
         output.innerHTML = `
