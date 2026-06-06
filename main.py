@@ -1,3 +1,6 @@
+!pip install dnspython
+!mkdir -p static # Create the static directory if it doesn't exist
+
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
@@ -255,11 +258,35 @@ async def check_spamhaus(ip):
         return response
 
 # ==================================================
+# OTHER DNSBLs (Placeholder for future expansion)
+# ==================================================
+
+# Define common DNSBLs. This allows for easier management and expansion.
+DNSBLS = {
+    "Spamcop": "bl.spamcop.net",
+    "Barracuda": "b.barracudacentral.org"
+}
+
+# Generic DNSBL checker. This function can be extended to handle different DNSBL return codes.
+async def check_dnsbl(ip: str, dnsbl_zone: str):
+    reversed_ip = ".".join(reversed(ip.split(".")))
+    query = f"{reversed_ip}.{dnsbl_zone}"
+
+    result = await dns_lookup(query, "A")
+
+    if result in ["NXDOMAIN", "ERROR"]:
+        return "CLEAN"
+    else:
+        # For simplicity, if any A record is returned, consider it listed.
+        # Real DNSBLs often have specific A record values for different listing types.
+        return "LISTED"
+
+# ==================================================
 # SINGLE IP API
 # ==================================================
 
 @app.get("/api/ip/{ip}")
-async def check_ip(ip: str):
+async def check_single_ip(ip: str):
 
     try:
         ipaddress.ip_address(ip)
@@ -269,64 +296,102 @@ async def check_ip(ip: str):
             detail="Invalid IP Address"
         )
 
-    spamhaus = await check_dnsbl(ip, DNSBLS["Spamhaus"])
-    spamcop = await check_dnsbl(ip, DNSBLS["Spamcop"])
-    barracuda = await check_dnsbl(ip, DNSBLS["Barracuda"])
+    # Check Spamhaus (detailed)
+    spamhaus_result = await check_spamhaus(ip)
 
-    statuses = [spamhaus, spamcop, barracuda]
+    # Check other DNSBLs (simplified for now)
+    spamcop_status = await check_dnsbl(ip, DNSBLS["Spamcop"])
+    barracuda_status = await check_dnsbl(ip, DNSBLS["Barracuda"])
 
-    if "LISTED" in statuses:
-        overall = "LISTED"
+    # Aggregate statuses for overall status
+    all_statuses = [
+        spamhaus_result["css"],
+        spamhaus_result["sbl"],
+        spamhaus_result["xbl"],
+        spamhaus_result["pbl"],
+        spamhaus_result["authbl"],
+        spamcop_status,
+        barracuda_status
+    ]
 
-    elif all(x == "CLEAN" for x in statuses):
-        overall = "CLEAN"
-
-    else:
-        overall = "UNKNOWN"
+    overall_status = "CLEAN"
+    if "LISTED" in all_statuses:
+        overall_status = "LISTED"
+    elif any(s == "ERROR" for s in all_statuses): # Consider DNS lookup errors as UNKNOWN for overall
+        overall_status = "UNKNOWN"
 
     return {
         "ip": ip,
-        "spamhaus": spamhaus,
-        "spamcop": spamcop,
-        "barracuda": barracuda,
-        "overall": overall
+        "spamhaus": {
+            "css": spamhaus_result["css"],
+            "sbl": spamhaus_result["sbl"],
+            "xbl": spamhaus_result["xbl"],
+            "pbl": spamhaus_result["pbl"],
+            "authbl": spamhaus_result["authbl"]
+        },
+        "spamcop": {"status": spamcop_status},
+        "barracuda": {"status": barracuda_status},
+        "overall_status": overall_status
     }
+
 # ==================================================
 # BULK CIDR API
 # ==================================================
 
-for ip in network.hosts():
-
-    ip = str(ip)
-
-    spamhaus = await check_spamhaus(ip)
-
-    results.append({
-        "ip": ip,
-        "css": spamhaus["css"],
-        "sbl": spamhaus["sbl"],
-        "xbl": spamhaus["xbl"],
-        "pbl": spamhaus["pbl"],
-        "authbl": spamhaus["authbl"]
-    })
-
-@app.get("/api/ip/{ip}")
-async def check_ip(ip: str):
-
+@app.get("/api/cidr/{cidr_block}")
+async def check_bulk_cidr(cidr_block: str):
     try:
-        ipaddress.ip_address(ip)
+        network = ipaddress.ip_network(cidr_block, strict=False)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid IP Address")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid CIDR block"
+        )
 
-    spamhaus = await check_dnsbl(ip, DNSBLS["Spamhaus"])
+    results = []
+    # Limit the number of IPs to check in a bulk request to prevent abuse/long processing
+    max_ips = 256 # For example, checking up to a /24 network
+
+    ip_count = 0
+    for ip_obj in network.hosts():
+        if ip_count >= max_ips:
+            print(f"Truncating CIDR check to {max_ips} IPs for {cidr_block}")
+            break
+        ip = str(ip_obj)
+
+        spamhaus = await check_spamhaus(ip)
+        spamcop = await check_dnsbl(ip, DNSBLS["Spamcop"])
+        barracuda = await check_dnsbl(ip, DNSBLS["Barracuda"])
+
+        # Determine overall status for this single IP in the CIDR block
+        single_ip_statuses = [
+            spamhaus["css"], spamhaus["sbl"], spamhaus["xbl"], spamhaus["pbl"], spamhaus["authbl"],
+            spamcop, barracuda
+        ]
+        single_ip_overall = "CLEAN"
+        if "LISTED" in single_ip_statuses:
+            single_ip_overall = "LISTED"
+        elif any(s == "ERROR" for s in single_ip_statuses):
+            single_ip_overall = "UNKNOWN"
+
+
+        results.append({
+            "ip": ip,
+            "spamhaus": {
+                "css": spamhaus["css"],
+                "sbl": spamhaus["sbl"],
+                "xbl": spamhaus["xbl"],
+                "pbl": spamhaus["pbl"],
+                "authbl": spamhaus["authbl"]
+            },
+            "spamcop": {"status": spamcop},
+            "barracuda": {"status": barracuda},
+            "overall_status": single_ip_overall
+        })
+        ip_count += 1
 
     return {
-        "ip": ip,
-        "results": [
-            {"blacklist": "CSS", "status": spamhaus.get("css", "NOT LISTED")},
-            {"blacklist": "SBL", "status": spamhaus.get("sbl", "NOT LISTED")},
-            {"blacklist": "XBL", "status": spamhaus.get("xbl", "NOT LISTED")},
-            {"blacklist": "PBL", "status": spamhaus.get("pbl", "NOT LISTED")},
-            {"blacklist": "AuthBL", "status": spamhaus.get("authbl", "NOT LISTED")}
-        ]
+        "cidr_block": cidr_block,
+        "checked_ips_count": ip_count,
+        "results": results
     }
