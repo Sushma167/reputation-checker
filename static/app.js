@@ -314,150 +314,78 @@ async function checkIP(){
 async function checkBulk(){
 
     const cidr =
-        document.getElementById(
-            "bulkInput"
-        ).value.trim();
+        document.getElementById("bulkInput").value.trim();
 
     if(!cidr){
-
-        alert(
-            "Please enter a CIDR range"
-        );
-
+        alert("Please enter a CIDR range");
         return;
     }
 
     const output =
-        document.getElementById(
-            "bulkResult"
-        );
+        document.getElementById("bulkResult");
 
-    output.innerHTML =
-        loader();
+    output.innerHTML = loader();
 
     try{
 
         const response =
-            await fetch(
-                `/api/bulk?cidr=${encodeURIComponent(cidr)}`
-            );
+            await fetch(`/api/bulk?cidr=${encodeURIComponent(cidr)}`);
 
-        const data =
-            await response.json();
+        const data = await response.json();
 
         if(data.detail){
-
-            output.innerHTML = `
-
-            <div class="result-card">
-
-                ${data.detail}
-
-            </div>
-
-            `;
-
+            output.innerHTML = `<div class="result-card">${data.detail}</div>`;
             return;
         }
 
         let rows = "";
 
-        data.results.forEach(item=>{
+        data.results.forEach(item => {
 
             rows += `
-
-            <tr>
-
-                <td>${item.ip}</td>
-
-                <td>
-                    ${getBadge(item.spamhaus)}
-                </td>
-
-                <td>
-                    ${getBadge(item.spamcop)}
-                </td>
-
-                <td>
-                    ${getBadge(item.barracuda)}
-                </td>
-
-                <td>
-                    ${getBadge(item.overall)}
-                </td>
-
-            </tr>
-
+                <tr>
+                    <td>${item.ip}</td>
+                    <td>${getBadge(item.spamhaus)}</td>
+                    <td>${getBadge(item.spamcop)}</td>
+                    <td>${getBadge(item.barracuda)}</td>
+                    <td>${getBadge(item.overall)}</td>
+                </tr>
             `;
         });
 
         output.innerHTML = `
+            <div class="result-card">
 
-        <div class="result-card">
+                <h3>CIDR: ${data.cidr}</h3>
+                <p>Total IPs: ${data.total}</p>
 
-            <h3>
-                CIDR Range:
-                ${data.cidr}
-            </h3>
+                <table>
 
-            <p>
-                Total IPs:
-                ${data.total}
-            </p>
+                    <thead>
+                        <tr>
+                            <th>IP</th>
+                            <th>Spamhaus</th>
+                            <th>Spamcop</th>
+                            <th>Barracuda</th>
+                            <th>Overall</th>
+                        </tr>
+                    </thead>
 
-            <table>
+                    <tbody>
+                        ${rows}
+                    </tbody>
 
-                <thead>
+                </table>
 
-                    <tr>
-
-                        <th>IP</th>
-
-                        <th>Spamhaus</th>
-
-                        <th>Spamcop</th>
-
-                        <th>Barracuda</th>
-
-                        <th>Overall</th>
-
-                    </tr>
-
-                </thead>
-
-                <tbody>
-
-                    ${rows}
-
-                </tbody>
-
-            </table>
-
-        </div>
-
+            </div>
         `;
-data.results.forEach(row => {
-    tbody.innerHTML += `
-        <tr>
-            <td>${row.ip}</td>
-            <td>${row.css}</td>
-            <td>${row.sbl}</td>
-            <td>${row.xbl}</td>
-            <td>${row.pbl}</td>
-            <td>${row.authbl}</td>
-        </tr>
-    `;
-});
-    }catch(error){
+
+    } catch(error){
 
         output.innerHTML = `
-
-        <div class="result-card">
-
-            Bulk scan failed
-
-        </div>
-
+            <div class="result-card">
+                Bulk scan failed
+            </div>
         `;
     }
 }
