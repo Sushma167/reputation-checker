@@ -263,23 +263,33 @@ async def check_ip(ip: str):
 
     try:
         ipaddress.ip_address(ip)
-
     except ValueError:
-
         raise HTTPException(
             status_code=400,
             detail="Invalid IP Address"
         )
 
-    spamhaus = await check_spamhaus(ip)
+    spamhaus = await check_dnsbl(ip, DNSBLS["Spamhaus"])
+    spamcop = await check_dnsbl(ip, DNSBLS["Spamcop"])
+    barracuda = await check_dnsbl(ip, DNSBLS["Barracuda"])
+
+    statuses = [spamhaus, spamcop, barracuda]
+
+    if "LISTED" in statuses:
+        overall = "LISTED"
+
+    elif all(x == "CLEAN" for x in statuses):
+        overall = "CLEAN"
+
+    else:
+        overall = "UNKNOWN"
 
     return {
         "ip": ip,
-        "css": spamhaus["css"],
-        "sbl": spamhaus["sbl"],
-        "xbl": spamhaus["xbl"],
-        "pbl": spamhaus["pbl"],
-        "authbl": spamhaus["authbl"]
+        "spamhaus": spamhaus,
+        "spamcop": spamcop,
+        "barracuda": barracuda,
+        "overall": overall
     }
 # ==================================================
 # BULK CIDR API
