@@ -310,13 +310,23 @@ for ip in network.hosts():
         "authbl": spamhaus["authbl"]
     })
 
-  return {
-    "ip": ip,
-    "results": [
-        {"blacklist": "CSS", "status": spamhaus["css"]},
-        {"blacklist": "SBL", "status": spamhaus["sbl"]},
-        {"blacklist": "XBL", "status": spamhaus["xbl"]},
-        {"blacklist": "PBL", "status": spamhaus["pbl"]},
-        {"blacklist": "AuthBL", "status": spamhaus["authbl"]}
-    ]
-}
+@app.get("/api/ip/{ip}")
+async def check_ip(ip: str):
+
+    try:
+        ipaddress.ip_address(ip)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid IP Address")
+
+    spamhaus = await check_dnsbl(ip, DNSBLS["Spamhaus"])
+
+    return {
+        "ip": ip,
+        "results": [
+            {"blacklist": "CSS", "status": spamhaus.get("css", "NOT LISTED")},
+            {"blacklist": "SBL", "status": spamhaus.get("sbl", "NOT LISTED")},
+            {"blacklist": "XBL", "status": spamhaus.get("xbl", "NOT LISTED")},
+            {"blacklist": "PBL", "status": spamhaus.get("pbl", "NOT LISTED")},
+            {"blacklist": "AuthBL", "status": spamhaus.get("authbl", "NOT LISTED")}
+        ]
+    }
