@@ -1,6 +1,3 @@
-!pip install dnspython
-!mkdir -p static # Create the static directory if it doesn't exist
-
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
